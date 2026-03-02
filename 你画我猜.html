@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>你画我猜 - 练习模式</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-card: #ffffff;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --text-muted: #a0aec0;
+            --accent: #4299e1;
+            --accent-hover: #3182ce;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 20px 0 30px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            margin-top: 8px;
+            font-size: 0.95rem;
+        }
+
+        /* Main Layout */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Card Base */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Canvas Area */
+        .canvas-section {
+            width: 100%;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            background: #ffffff;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--border);
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #drawingCanvas {
+            display: block;
+            width: 100%;
+            cursor: crosshair;
+            background: #ffffff;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .stat-badge {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-badge svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .stat-badge.timer {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .stat-badge.timer.warning {
+            color: #e53e3e;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Right Panel */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: sticky;
+            top: 20px;
+        }
+
+        /* Word Display */
+        .word-card {
+            text-align: center;
+            padding: 32px 24px;
+        }
+
+        .word-category {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent), #667eea);
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .word-display {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 16px 0;
+            letter-spacing: 4px;
+        }
+
+        .word-hint {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        /* Tools Panel */
+        .tools-card {
+            padding: 20px;
+        }
+
+        .tools-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        /* Color Palette */
+        .color-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .color-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .color-btn.active {
+            border-color: var(--text-primary);
+            box-shadow: 0 0 0 2px white, 0 0 0 4px var(--text-primary);
+        }
+
+        .color-btn.eraser-btn {
+            background: linear-gradient(135deg, #ffffff 50%, #f0f0f0 50%);
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .color-btn.eraser-btn svg {
+            width: 18px;
+            height: 18px;
+            color: var(--text-secondary);
+        }
+
+        /* Brush Sizes */
+        .brush-sizes {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .brush-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-sm);
+            border: 2px solid var(--border);
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .brush-btn:hover {
+            border-color: var(--accent);
+        }
+
+        .brush-btn.active {
+            border-color: var(--accent);
+            background: rgba(66, 153, 225, 0.1);
+        }
+
+        .brush-dot {
+            border-radius: 50%;
+            background: var(--text-primary);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .action-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Timer Toggle */
+        .timer-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 16px;
+        }
+
+        .toggle-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: var(--border);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .toggle-switch.active {
+            background: var(--accent);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(22px);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .right-panel {
+                position: static;
+            }
+
+            .word-display {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .app-container {
+                padding: 12px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .word-card {
+                padding: 24px 16px;
+            }
+
+            .word-display {
+                font-size: 2rem;
+                letter-spacing: 2px;
+            }
+
+            .color-btn {
+                width: 32px;
+                height: 32px;
+            }
+
+            .brush-btn {
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+        /* Animations */
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+        }
+
+        .word-enter-active {
+            animation: wordIn 0.4s ease;
+        }
+
+        @keyframes wordIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="app-container">
+            <!-- Header -->
+            <header class="header">
+                <h1>🎨 你画我猜</h1>
+                <p>练习模式 - 提升你的绘画技巧</p>
+            </header>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Canvas Section -->
+                <div class="canvas-section card">
+                    <div class="canvas-wrapper" ref="canvasWrapper">
+                        <canvas 
+                            id="drawingCanvas" 
+                            ref="canvas"
+                            @mousedown="startDrawing"
+                            @mousemove="draw"
+                            @mouseup="stopDrawing"
+                            @mouseleave="stopDrawing"
+                            @touchstart="handleTouchStart"
+                            @touchmove="handleTouchMove"
+                            @touchend="stopDrawing"
+                        ></canvas>
+                        <div class="canvas-overlay">
+                            <div class="stat-badge">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                </svg>
+                                {{ strokeCount }} 笔画
+                            </div>
+                            <div class="stat-badge timer" :class="{ warning: timerRunning && timeLeft <= 10 }" v-if="timerEnabled">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                {{ formatTime(timeLeft) }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel -->
+                <div class="right-panel">
+                    <!-- Word Display -->
+                    <div class="card word-card">
+                        <div class="word-category">{{ currentWord.category }}</div>
+                        <transition name="word" mode="out-in">
+                            <div class="word-display" :key="currentWord.word">{{ currentWord.word }}</div>
+                        </transition>
+                        <p class="word-hint">{{ currentWord.hint }}</p>
+                        <button class="btn btn-primary btn-full" @click="nextWord" style="margin-top: 20px;">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                            </svg>
+                            换一个词
+                        </button>
+                    </div>
+
+                    <!-- Tools Panel -->
+                    <div class="card tools-card">
+                        <div class="tools-title">画笔颜色</div>
+                        <div class="color-palette">
+                            <button 
+                                v-for="color in colors" 
+                                :key="color.value"
+                                class="color-btn"
+                                :class="{ active: currentColor === color.value && !isEraser }"
+                                :style="{ background: color.value }"
+                                @click="selectColor(color.value)"
+                                :title="color.name"
+                            ></button>
+                            <button 
+                                class="color-btn eraser-btn"
+                                :class="{ active: isEraser }"
+                                @click="toggleEraser"
+                                title="橡皮擦"
+                            >
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="tools-title">画笔大小</div>
+                        <div class="brush-sizes">
+                            <button 
+                                v-for="size in brushSizes" 
+                                :key="size.value"
+                                class="brush-btn"
+                                :class="{ active: currentBrushSize === size.value }"
+                                @click="selectBrushSize(size.value)"
+                                :title="size.name"
+                            >
+                                <span class="brush-dot" :style="{ width: size.display + 'px', height: size.display + 'px' }"></span>
+                            </button>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="action-btn" @click="undo" :disabled="strokes.length === 0">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                </svg>
+                                撤销
+                            </button>
+                            <button class="action-btn" @click="clearCanvas">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                                清空
+                            </button>
+                        </div>
+
+                        <div class="timer-toggle">
+                            <span class="toggle-label">计时器 (60秒)</span>
+                            <div 
+                                class="toggle-switch" 
+                                :class="{ active: timerEnabled }"
+                                @click="toggleTimer"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, onMounted, onUnmounted, watch, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                // Canvas refs
+                const canvas = ref(null);
+                const canvasWrapper = ref(null);
+                let ctx = null;
+
+                // Drawing state
+                const isDrawing = ref(false);
+                const currentColor = ref('#2d3748');
+                const currentBrushSize = ref(6);
+                const isEraser = ref(false);
+                const strokes = ref([]);
+                const strokeCount = ref(0);
+                let currentStroke = [];
+                let lastX = 0;
+                let lastY = 0;
+
+                // Timer
+                const timerEnabled = ref(false);
+                const timerRunning = ref(false);
+                const timeLeft = ref(60);
+                let timerInterval = null;
+
+                // Colors
+                const colors = [
+                    { name: '黑色', value: '#2d3748' },
+                    { name: '深灰', value: '#4a5568' },
+                    { name: '红色', value: '#e53e3e' },
+                    { name: '橙色', value: '#ed8936' },
+                    { name: '黄色', value: '#ecc94b' },
+                    { name: '绿色', value: '#48bb78' },
+                    { name: '蓝色', value: '#4299e1' },
+                    { name: '紫色', value: '#9f7aea' },
+                    { name: '粉色', value: '#ed64a6' },
+                    { name: '棕色', value: '#a0522d' },
+                ];
+
+                // Brush sizes
+                const brushSizes = [
+                    { name: '细', value: 3, display: 4 },
+                    { name: '中', value: 6, display: 8 },
+                    { name: '粗', value: 12, display: 14 },
+                    { name: '特粗', value: 24, display: 20 },
+                ];
+
+                // Word bank
+                const wordBank = [
+                    // 动物
+                    { word: '猫咪', category: '动物', hint: '一种可爱的宠物' },
+                    { word: '小狗', category: '动物', hint: '人类最好的朋友' },
+                    { word: '兔子', category: '动物', hint: '长耳朵，爱吃胡萝卜' },
+                    { word: '大象', category: '动物', hint: '陆地上最大的动物' },
+                    { word: '老虎', category: '动物', hint: '森林之王' },
+                    { word: '熊猫', category: '动物', hint: '国宝，黑白相间' },
+                    { word: '蝴蝶', category: '动物', hint: '会飞的花朵' },
+                    { word: '蜜蜂', category: '动物', hint: '勤劳的小昆虫' },
+                    { word: '金鱼', category: '动物', hint: '水中的宠物' },
+                    { word: '蜗牛', category: '动物', hint: '背着房子走' },
+                    // 食物
+                    { word: '苹果', category: '食物', hint: '红色的水果' },
+                    { word: '香蕉', category: '食物', hint: '弯弯的黄色水果' },
+                    { word: '西瓜', category: '食物', hint: '夏天解暑的水果' },
+                    { word: '蛋糕', category: '食物', hint: '生日必备' },
+                    { word: '冰淇淋', category: '食物', hint: '夏天的甜品' },
+                    { word: '汉堡', category: '食物', hint: '快餐代表' },
+                    { word: '饺子', category: '食物', hint: '中国传统美食' },
+                    { word: '面条', category: '食物', hint: '长长的主食' },
+                    { word: '披萨', category: '食物', hint: '意大利美食' },
+                    { word: '奶茶', category: '食物', hint: '年轻人的最爱' },
+                    // 物品
+                    { word: '手机', category: '物品', hint: '人人离不开的设备' },
+                    { word: '电脑', category: '物品', hint: '工作和娱乐的工具' },
+                    { word: '雨伞', category: '物品', hint: '下雨天的好帮手' },
+                    { word: '眼镜', category: '物品', hint: '帮助看清世界' },
+                    { word: '书包', category: '物品', hint: '学生必备' },
+                    { word: '钥匙', category: '物品', hint: '开门必备' },
+                    { word: '钟表', category: '物品', hint: '告诉我们时间' },
+                    { word: '台灯', category: '物品', hint: '夜晚学习的好伙伴' },
+                    { word: '相机', category: '物品', hint: '记录美好瞬间' },
+                    { word: '吉他', category: '物品', hint: '一种乐器' },
+                    // 自然
+                    { word: '太阳', category: '自然', hint: '给我们光和热' },
+                    { word: '月亮', category: '自然', hint: '夜晚的明灯' },
+                    { word: '星星', category: '自然', hint: '夜空中闪烁' },
+                    { word: '彩虹', category: '自然', hint: '雨后的七色桥' },
+                    { word: '云朵', category: '自然', hint: '天空中的棉花糖' },
+                    { word: '花朵', category: '自然', hint: '美丽的植物' },
+                    { word: '大树', category: '自然', hint: '提供阴凉' },
+                    { word: '山峰', category: '自然', hint: '高高的地形' },
+                    { word: '河流', category: '自然', hint: '流动的水' },
+                    { word: '雪花', category: '自然', hint: '冬天的精灵' },
+                    // 动作
+                    { word: '跑步', category: '动作', hint: '一种运动' },
+                    { word: '游泳', category: '动作', hint: '水中的运动' },
+                    { word: '跳舞', category: '动作', hint: '跟着音乐动起来' },
+                    { word: '唱歌', category: '动作', hint: '用声音表达' },
+                    { word: '画画', category: '动作', hint: '用笔创造' },
+                    { word: '睡觉', category: '动作', hint: '休息的方式' },
+                    { word: '吃饭', category: '动作', hint: '每天必做的事' },
+                    { word: '看书', category: '动作', hint: '获取知识的方式' },
+                    { word: '骑车', category: '动作', hint: '环保的出行方式' },
+                    { word: '钓鱼', category: '动作', hint: '耐心的活动' },
+                    // 建筑
+                    { word: '房子', category: '建筑', hint: '我们住的地方' },
+                    { word: '学校', category: '建筑', hint: '学习的地方' },
+                    { word: '医院', category: '建筑', hint: '看病的地方' },
+                    { word: '超市', category: '建筑', hint: '买东西的地方' },
+                    { word: '公园', category: '建筑', hint: '休闲的地方' },
+                    { word: '桥梁', category: '建筑', hint: '连接两岸' },
+                    { word: '灯塔', category: '建筑', hint: '指引方向' },
+                    { word: '城堡', category: '建筑', hint: '童话里的建筑' },
+                    { word: '帐篷', category: '建筑', hint: '露营时的家' },
+                    { word: '摩天轮', category: '建筑', hint: '游乐场的标志' },
+                ];
+
+                const currentWord = ref(wordBank[0]);
+                const usedWords = ref([]);
+
+                // Initialize canvas
+                const initCanvas = () => {
+                    const cvs = canvas.value;
+                    const wrapper = canvasWrapper.value;
+                    
+                    // Set canvas size
+                    const rect = wrapper.getBoundingClientRect();
+                    const dpr = window.devicePixelRatio || 1;
+                    
+                    cvs.width = rect.width * dpr;
+                    cvs.height = Math.max(500, rect.width * 0.65) * dpr;
+                    cvs.style.height = Math.max(500, rect.width * 0.65) + 'px';
+                    
+                    ctx = cvs.getContext('2d');
+                    ctx.scale(dpr, dpr);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    
+                    // Redraw existing strokes
+                    redrawCanvas();
+                };
+
+                // Redraw all strokes
+                const redrawCanvas = () => {
+                    const cvs = canvas.value;
+                    const dpr = window.devicePixelRatio || 1;
+                    ctx.clearRect(0, 0, cvs.width / dpr, cvs.height / dpr);
+                    
+                    strokes.value.forEach(stroke => {
+                        if (stroke.points.length < 2) return;
+                        
+                        ctx.beginPath();
+                        ctx.strokeStyle = stroke.color;
+                        ctx.lineWidth = stroke.size;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        
+                        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                        
+                        for (let i = 1; i < stroke.points.length; i++) {
+                            const p0 = stroke.points[i - 1];
+                            const p1 = stroke.points[i];
+                            const midX = (p0.x + p1.x) / 2;
+                            const midY = (p0.y + p1.y) / 2;
+                            ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
+                        }
+                        
+                        ctx.stroke();
+                    });
+                };
+
+                // Get position from event
+                const getPosition = (e) => {
+                    const cvs = canvas.value;
+                    const rect = cvs.getBoundingClientRect();
+                    
+                    if (e.touches) {
+                        return {
+                            x: e.touches[0].clientX - rect.left,
+                            y: e.touches[0].clientY - rect.top
+                        };
+                    }
+                    
+                    return {
+                        x: e.clientX - rect.left,
+                        y: e.clientY - rect.top
+                    };
+                };
+
+                // Drawing functions
+                const startDrawing = (e) => {
+                    isDrawing.value = true;
+                    const pos = getPosition(e);
+                    lastX = pos.x;
+                    lastY = pos.y;
+                    
+                    currentStroke = {
+                        color: isEraser.value ? '#ffffff' : currentColor.value,
+                        size: currentBrushSize.value,
+                        points: [{ x: pos.x, y: pos.y }]
+                    };
+                };
+
+                const draw = (e) => {
+                    if (!isDrawing.value) return;
+                    
+                    const pos = getPosition(e);
+                    
+                    ctx.beginPath();
+                    ctx.strokeStyle = isEraser.value ? '#ffffff' : currentColor.value;
+                    ctx.lineWidth = currentBrushSize.value;
+                    ctx.moveTo(lastX, lastY);
+                    
+                    // Smooth line using quadratic curves
+                    const midX = (lastX + pos.x) / 2;
+                    const midY = (lastY + pos.y) / 2;
+                    ctx.quadraticCurveTo(lastX, lastY, midX, midY);
+                    ctx.stroke();
+                    
+                    currentStroke.points.push({ x: pos.x, y: pos.y });
+                    
+                    lastX = pos.x;
+                    lastY = pos.y;
+                };
+
+                const stopDrawing = () => {
+                    if (isDrawing.value && currentStroke.points.length > 0) {
+                        strokes.value.push(currentStroke);
+                        strokeCount.value++;
+                    }
+                    isDrawing.value = false;
+                    currentStroke = [];
+                };
+
+                // Touch handlers
+                const handleTouchStart = (e) => {
+                    e.preventDefault();
+                    startDrawing(e);
+                };
+
+                const handleTouchMove = (e) => {
+                    e.preventDefault();
+                    draw(e);
+                };
+
+                // Tool functions
+                const selectColor = (color) => {
+                    currentColor.value = color;
+                    isEraser.value = false;
+                };
+
+                const selectBrushSize = (size) => {
+                    currentBrushSize.value = size;
+                };
+
+                const toggleEraser = () => {
+                    isEraser.value = !isEraser.value;
+                };
+
+                const undo = () => {
+                    if (strokes.value.length > 0) {
+                        strokes.value.pop();
+                        strokeCount.value = Math.max(0, strokeCount.value - 1);
+                        redrawCanvas();
+                    }
+                };
+
+                const clearCanvas = () => {
+                    strokes.value = [];
+                    strokeCount.value = 0;
+                    redrawCanvas();
+                };
+
+                // Word functions
+                const nextWord = () => {
+                    // Reset if all words used
+                    if (usedWords.value.length >= wordBank.length) {
+                        usedWords.value = [];
+                    }
+                    
+                    // Get available words
+                    const available = wordBank.filter(w => !usedWords.value.includes(w.word));
+                    
+                    // Random selection
+                    const randomIndex = Math.floor(Math.random() * available.length);
+                    currentWord.value = available[randomIndex];
+                    usedWords.value.push(currentWord.value.word);
+                    
+                    // Reset timer if enabled
+                    if (timerEnabled.value) {
+                        resetTimer();
+                    }
+                    
+                    // Clear canvas for new word
+                    clearCanvas();
+                };
+
+                // Timer functions
+                const formatTime = (seconds) => {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                };
+
+                const startTimer = () => {
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerRunning.value = true;
+                    timerInterval = setInterval(() => {
+                        if (timeLeft.value > 0) {
+                            timeLeft.value--;
+                        } else {
+                            clearInterval(timerInterval);
+                            timerRunning.value = false;
+                            // Auto next word when time's up
+                            nextWord();
+                        }
+                    }, 1000);
+                };
+
+                const resetTimer = () => {
+                    timeLeft.value = 60;
+                    if (timerEnabled.value) {
+                        startTimer();
+                    }
+                };
+
+                const toggleTimer = () => {
+                    timerEnabled.value = !timerEnabled.value;
+                    if (timerEnabled.value) {
+                        startTimer();
+                    } else {
+                        if (timerInterval) clearInterval(timerInterval);
+                        timerRunning.value = false;
+                        timeLeft.value = 60;
+                    }
+                };
+
+                // Lifecycle
+                onMounted(() => {
+                    initCanvas();
+                    window.addEventListener('resize', initCanvas);
+                    
+                    // Initialize first word
+                    nextWord();
+                });
+
+                onUnmounted(() => {
+                    window.removeEventListener('resize', initCanvas);
+                    if (timerInterval) clearInterval(timerInterval);
+                });
+
+                return {
+                    canvas,
+                    canvasWrapper,
+                    isDrawing,
+                    currentColor,
+                    currentBrushSize,
+                    isEraser,
+                    strokes,
+                    strokeCount,
+                    colors,
+                    brushSizes,
+                    currentWord,
+                    timerEnabled,
+                    timerRunning,
+                    timeLeft,
+                    
+                    // Methods
+                    startDrawing,
+                    draw,
+                    stopDrawing,
+                    handleTouchStart,
+                    handleTouchMove,
+                    selectColor,
+                    selectBrushSize,
+                    toggleEraser,
+                    undo,
+                    clearCanvas,
+                    nextWord,
+                    formatTime,
+                    toggleTimer
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
